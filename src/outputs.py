@@ -3,25 +3,15 @@ import datetime as dt
 import logging
 from prettytable import PrettyTable
 
-from constants import BASE_DIR, DATETIME_FORMAT
+from constants import BASE_DIR, DATETIME_FORMAT, Choices, Dirs, Texts
 
 
-def control_output(results, cli_args):
-    output = cli_args.output
-    if output == 'pretty':
-        pretty_output(results)
-    elif output == 'file':
-        file_output(results, cli_args)
-    else:
-        default_output(results)
-
-
-def default_output(results):
+def default_output(results, *args):
     for row in results:
         print(*row)
 
 
-def pretty_output(results):
+def pretty_output(results, *args):
     table = PrettyTable()
     table.field_names = results[0]
     table.align = 'l'
@@ -30,16 +20,23 @@ def pretty_output(results):
 
 
 def file_output(results, cli_args):
-    results_dir = BASE_DIR / 'results'
+    results_dir = BASE_DIR / Dirs.RESULTS
     results_dir.mkdir(exist_ok=True)
     parser_mode = cli_args.mode
-    now = dt.datetime.now()
-    now_formatted = now.strftime(DATETIME_FORMAT)
+    now_formatted = dt.datetime.now().strftime(DATETIME_FORMAT)
     file_name = f'{parser_mode}_{now_formatted}.csv'
     file_path = results_dir / file_name
     with open(file_path, 'w', encoding='utf-8') as f:
-        # Создаём «объект записи» writer.
-        writer = csv.writer(f, dialect='unix')
-        # Передаём в метод writerows список с результатами парсинга.
-        writer.writerows(results)
-    logging.info(f'Файл с результатами был сохранён: {file_path}')
+        csv.writer(f, dialect=csv.unix_dialect).writerows(results)
+    logging.info(Texts.FILE_RESULT.format(file_path))
+
+
+OUTPUTS = {
+    Choices.PRETTY: pretty_output,
+    Choices.FILE: file_output,
+    None: default_output
+}
+
+
+def control_output(results, cli_args):
+    OUTPUTS[cli_args.output](results, cli_args)
