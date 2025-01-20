@@ -24,8 +24,8 @@ def find_tag(soup, tag, attrs=None):
     return searched_tag
 
 
-def calculate_soup(session, url):
-    response = get_response(session, url)
-    if response is None:
-        return None
-    return BeautifulSoup(response.text, features='lxml')
+def calculate_soup(session, url, features='lxml'):
+    return BeautifulSoup(
+        get_response(session, url).text,
+        features=features
+    )
