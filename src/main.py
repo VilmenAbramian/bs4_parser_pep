@@ -1,5 +1,4 @@
 from collections import Counter
-import csv
 import logging
 import re
 from urllib.parse import urljoin
@@ -18,34 +17,30 @@ from utils import calculate_soup, find_tag, get_response
 def whats_new(session):
     whats_new_url = urljoin(MAIN_DOC_URL, 'whatsnew/')
     soup = calculate_soup(session, whats_new_url)
-    if soup is None:
-        return
-    sections_by_python = soup.select(
-        '#what-s-new-in-python div.toctree-wrapper li.toctree-l1'
-    )
+    version_a_tag = soup.select(
+            '#what-s-new-in-python div.toctree-wrapper'
+            ' li.toctree-l1 a[href$=".html"]'
+        )
 
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, автор')]
-    for section in tqdm(sections_by_python):
-        version_a_tag = section.find('a')
-        version_link = urljoin(whats_new_url, version_a_tag['href'])
-        soup = calculate_soup(session, version_link)
-        if soup is None:
-            logging.error(f'Ресурс по ссылке: {version_link} не доступен!')
-            continue
-        results.append(
-            (
-                version_link,
-                find_tag(soup, 'h1').text,
-                find_tag(soup, 'dl').text.replace('\n', ' ')
+    for link in tqdm(version_a_tag):
+        version_link = urljoin(whats_new_url, link['href'])
+        try:
+            soup = calculate_soup(session, version_link)
+            results.append(
+                (
+                    version_link,
+                    find_tag(soup, 'h1').text,
+                    find_tag(soup, 'dl').text.replace('\n', ' ')
+                )
             )
-        )
+        except ConnectionError as e:
+            logging.error(Texts.RESPONSE_ERROR.format(version_link, e))
     return results
 
 
 def latest_versions(session):
     soup = calculate_soup(session, MAIN_DOC_URL)
-    if soup is None:
-        return
     sidebar = find_tag(soup, 'div', {'class': 'sphinxsidebarwrapper'})
     ul_tags = sidebar.find_all('ul')
 
@@ -54,7 +49,7 @@ def latest_versions(session):
             a_tags = ul.find_all('a')
             break
     else:
-        raise NotFoundError('Ничего не нашлось')
+        raise NotFoundError(Texts.NOTHING_FOUND)
 
     results = [('Ссылка на документацию', 'Версия', 'Статус')]
     pattern = r'Python (?P<version>\d\.\d+) \((?P<status>.*)\)'
@@ -73,8 +68,6 @@ def latest_versions(session):
 def download(session):
     downloads_url = urljoin(MAIN_DOC_URL, 'download.html')
     soup = calculate_soup(session, downloads_url)
-    if soup is None:
-        return
 
     main_tag = find_tag(soup, 'div', {'role': 'main'})
     pdf_a4_link = main_tag.select_one(
@@ -95,8 +88,6 @@ def download(session):
 
 def pep(session):
     soup = calculate_soup(session, PEP_URL)
-    if soup is None:
-        return
     main_block = find_tag(soup, 'section', attrs={'id': 'index-by-category'})
     sections = main_block.find_all('section')
     table_statuses = []
@@ -115,23 +106,26 @@ def pep(session):
             else:
                 table_statuses.append(None)
 
-            # Получить статусы со страницы каждого PEP'а
-            full_url = PEP_URL + tds[1].a.get('href')
-            pep_response = get_response(session, full_url)
-            pep_soup = BeautifulSoup(pep_response.text, features='lxml')
-            article_head = find_tag(
-                pep_soup,
-                'section',
-                attrs={'id': 'pep-page-section'}).article.section.dl
-            status_dt = None
-            for dt in article_head.find_all('dt'):
-                if 'Status' in dt.get_text(strip=True):
-                    status_dt = dt
-                    break
-            status_dd = status_dt.find_next_sibling('dd')
-            result_status = status_dd.find('abbr').get_text()
-            article_statuses_links.append([full_url, result_status])
-            article_statuses.append(result_status)
+            try:
+                # Получить статусы со страницы каждого PEP'а
+                full_url = PEP_URL + tds[1].a.get('href')
+                pep_response = get_response(session, full_url)
+                pep_soup = BeautifulSoup(pep_response.text, features='lxml')
+                article_head = find_tag(
+                    pep_soup,
+                    'section',
+                    attrs={'id': 'pep-page-section'}).article.section.dl
+                status_dt = None
+                for dt in article_head.find_all('dt'):
+                    if 'Status' in dt.get_text(strip=True):
+                        status_dt = dt
+                        break
+                status_dd = status_dt.find_next_sibling('dd')
+                result_status = status_dd.find('abbr').get_text()
+                article_statuses_links.append([full_url, result_status])
+                article_statuses.append(result_status)
+            except ConnectionError as e:
+                logging.error(Texts.RESPONSE_ERROR.format(full_url, e))
 
     for i in range(len(article_statuses_links)):
         if (table_statuses[i] is not None and table_statuses[i] !=
@@ -145,19 +139,12 @@ def pep(session):
             )
 
     counts = Counter(article_statuses)
-    total_count = sum(counts.values())
 
-    filename = 'statuses_summary.csv'
-    downloads_dir = BASE_DIR / Dirs.RESULTS
-    downloads_dir.mkdir(exist_ok=True)
-    archive_path = downloads_dir / filename
-
-    with open(archive_path, mode="w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow(["Статус", "Количество"])
-        for status, count in counts.items():
-            writer.writerow([status, count])
-        writer.writerow(["Total", total_count])
+    return [
+        ('Статус', 'Количество'),
+        *counts.items(),
+        ('Всего', sum(counts.values())),
+    ]
 
 
 MODE_TO_FUNCTION = {

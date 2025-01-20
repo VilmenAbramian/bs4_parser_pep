@@ -2,14 +2,8 @@ from pathlib import Path
 
 
 DATETIME_FORMAT = '%Y-%m-%d_%H-%M-%S'
-
 MAIN_DOC_URL = 'https://docs.python.org/3/'
 PEP_URL = 'https://peps.python.org/'
-
-BASE_DIR = Path(__file__).parent
-LOG_DIR = BASE_DIR / 'logs'
-LOG_FILE = LOG_DIR / 'parser.log'
-DOWNLOADS_DIR = BASE_DIR / 'downloads'
 
 
 class Choices:
@@ -20,6 +14,12 @@ class Choices:
 class Dirs:
     DOWNLOADS = 'downloads'
     RESULTS = 'results'
+
+
+BASE_DIR = Path(__file__).parent
+LOG_DIR = BASE_DIR / 'logs'
+LOG_FILE = LOG_DIR / 'parser.log'
+DOWNLOADS_DIR = BASE_DIR / Dirs.DOWNLOADS
 
 
 class Texts:
@@ -38,6 +38,7 @@ class Texts:
         'Несовпадающие статусы: {} Статус в карточке: {} Ожидаемые статусы: {}'
     )
     LOAD_ARCHIVE = 'Архив был загружен и сохранён: {}'
+    NOTHING_FOUND = 'Ничего не нашлось'
 
 
 EXPECTED_STATUS = {
