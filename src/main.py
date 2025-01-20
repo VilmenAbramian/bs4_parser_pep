@@ -23,6 +23,7 @@ def whats_new(session):
         )
 
     results = [('Ссылка на статью', 'Заголовок', 'Редактор, автор')]
+    errors = []
     for link in tqdm(version_a_tag):
         version_link = urljoin(whats_new_url, link['href'])
         try:
@@ -35,7 +36,8 @@ def whats_new(session):
                 )
             )
         except ConnectionError as e:
-            logging.error(Texts.RESPONSE_ERROR.format(version_link, e))
+            errors.append(Texts.RESPONSE_ERROR.format(version_link, e))
+    [*map(logging.error, errors)]
     return results
 
 
@@ -94,6 +96,7 @@ def pep(session):
     article_statuses_links = []
     article_statuses = []
     pep_links = []
+    errors = []
     for section in sections:
         rows = section.table.tbody.find_all('tr')
         for row in rows:
@@ -125,7 +128,8 @@ def pep(session):
                 article_statuses_links.append([full_url, result_status])
                 article_statuses.append(result_status)
             except ConnectionError as e:
-                logging.error(Texts.RESPONSE_ERROR.format(full_url, e))
+                errors.append(Texts.RESPONSE_ERROR.format(full_url, e))
+        [*map(logging.error, errors)]
 
     for i in range(len(article_statuses_links)):
         if (table_statuses[i] is not None and table_statuses[i] !=
